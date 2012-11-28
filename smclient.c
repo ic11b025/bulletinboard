@@ -81,7 +81,7 @@ int main(int argc, const char * const * argv)
     
     fprintf(stdout, "Hello\n");
     
-    smc_parsecommandline(argc, argv, usagefunc, &server, &port, &user, &message, &img_url, verbose);
+    smc_parsecommandline(argc, argv, &usagefunc, &server, &port, &user, &message, &img_url, verbose);
     
     fprintf(stdout, "Hello2\n"); 
     fprintf(stdout, "server=%s\n"
