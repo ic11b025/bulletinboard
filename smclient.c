@@ -18,10 +18,10 @@
 /*
 * -------------------------------------------------------------- includes --
 */
-#include "stdio.h"
-#include "stdlib.h"
-#include "errno.h"
-#include <simple_message_client_commandline_handling.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include "simple_message_client_commandline_handling.h"
 /*
 * --------------------------------------------------------------- defines --
 */
@@ -75,13 +75,13 @@ int main(int argc, const char * const * argv)
     const char *user    = NULL;
     const char *message = NULL;
     const char *img_url = NULL;
-    int *verbose        = NULL;
+    int verbose;
 
     executable   = argv[0];      /* Name der ausgeführten Datei für Fehlerausgabe */
     
     fprintf(stdout, "Hello\n");
     
-    smc_parsecommandline(argc, argv, usagefunc, &server, &port, &user, &message, &img_url, verbose);
+    smc_parsecommandline(argc, argv, *usagefunc, &server, &port, &user, &message, &img_url, &verbose);
     
     fprintf(stdout, "Hello2\n"); 
     fprintf(stdout, "server=%s\n"
@@ -89,7 +89,7 @@ int main(int argc, const char * const * argv)
                     "user=%s\n"
                     "message=%s\n"
                     "img=%s\n"
-                    "verbose=%d\n", server, port, user, message, img_url, *verbose);
+                    "verbose=%d\n", server, port, user, message, img_url, verbose);
 
     return(0);
 }
