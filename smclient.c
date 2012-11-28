@@ -44,7 +44,7 @@ const char * executable;   /*speichert den Namen der ausführbaren Datei*/
 *
 */
 
-void print_usage(FILE * file, const char * text, int exitCode) {
+void usagefunc(FILE * file, const char * text, int exitCode) {
     
     if (file) {fprintf(stderr, "\n");}
     if (text) {fprintf(stderr, "\n");}
@@ -69,19 +69,19 @@ void print_usage(FILE * file, const char * text, int exitCode) {
 int main(int argc, const char * const * argv)
 {
     /*smc_usagefunc_t usagefunc = NULL;*/
-    smc_usagefunc_t usagefunc = &print_usage;  /* irgendwas passt da nicht */
-    const char **server  = NULL;
-    const char **port    = NULL;
-    const char **user    = NULL;
-    const char **message = NULL;
-    const char **img_url = NULL;
-    int *verbose         = NULL;
+    /*smc_usagefunc_t usagefunc = print_usage;*/  /* irgendwas passt da nicht */
+    const char *server  = NULL;
+    const char *port    = NULL;
+    const char *user    = NULL;
+    const char *message = NULL;
+    const char *img_url = NULL;
+    int *verbose        = NULL;
 
     executable   = argv[0];      /* Name der ausgeführten Datei für Fehlerausgabe */
     
     fprintf(stdout, "Hello\n");
     
-    smc_parsecommandline(argc, argv, usagefunc, server, port, user, message, img_url, verbose);
+    smc_parsecommandline(argc, argv, usagefunc, &server, &port, &user, &message, &img_url, verbose);
     
     fprintf(stdout, "Hello2\n"); 
     fprintf(stdout, "server=%s\n"
@@ -89,7 +89,7 @@ int main(int argc, const char * const * argv)
                     "user=%s\n"
                     "message=%s\n"
                     "img=%s\n"
-                    "verbose=%d\n", *server, *port, *user, *message, *img_url, *verbose);
+                    "verbose=%d\n", server, port, user, message, img_url, *verbose);
 
     return(0);
 }
