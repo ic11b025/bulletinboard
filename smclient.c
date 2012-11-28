@@ -19,6 +19,8 @@
 * -------------------------------------------------------------- includes --
 */
 #include "stdio.h"
+#include "stdlib.h"
+#include "errno.h"
 #include <simple_message_client_commandline_handling.h>
 /*
 * --------------------------------------------------------------- defines --
@@ -38,6 +40,22 @@ const char * executable;   /*speichert den Namen der ausführbaren Datei*/
 
 /**
 *
+* \brief prints the usage information
+*
+*/
+
+void print_usage(FILE * file, const char * text, int exitCode) {
+    
+    if (file) {fprintf(stderr, "\n");}
+    if (text) {fprintf(stderr, "\n");}
+    if (exitCode) {fprintf(stderr, "\n");}
+    fprintf(stderr, "Usage: bla bla");
+    exit(exitCode);
+    
+}
+
+/**
+*
 * \brief implements the message client
 *
 * This is the main entry point for any C program.
@@ -48,12 +66,31 @@ const char * executable;   /*speichert den Namen der ausführbaren Datei*/
 * \return success or failure
 *
 */
-int main(int argc, char * const * argv)
+int main(int argc, const char * const * argv)
 {
-    argc = argc;                 /*supress waring*/
+    /*smc_usagefunc_t usagefunc = NULL;*/
+    smc_usagefunc_t usagefunc = &print_usage;  /* irgendwas passt da nicht */
+    const char **server  = NULL;
+    const char **port    = NULL;
+    const char **user    = NULL;
+    const char **message = NULL;
+    const char **img_url = NULL;
+    int *verbose         = NULL;
+
     executable   = argv[0];      /* Name der ausgeführten Datei für Fehlerausgabe */
     
     fprintf(stdout, "Hello\n");
+    
+    smc_parsecommandline(argc, argv, usagefunc, server, port, user, message, img_url, verbose);
+    
+    fprintf(stdout, "Hello2\n"); 
+    fprintf(stdout, "server=%s\n"
+                    "port=%s\n"
+                    "user=%s\n"
+                    "message=%s\n"
+                    "img=%s\n"
+                    "verbose=%d\n", *server, *port, *user, *message, *img_url, *verbose);
+
     return(0);
 }
 

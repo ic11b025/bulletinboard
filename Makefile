@@ -38,7 +38,7 @@ OBJECTCLIENT := smclient.o
 all: smclient
 
 smclient: $(OBJECTCLIENT)
-	$(CC) $(CFLAGS) -o $@ $^ -lsem182
+	$(CC) $(CFLAGS) -o $@ $^ -lsimple_message_client_commandline_handling
 
 clean:
 	$(RM) $(OBJECTCLIENT) smclient
