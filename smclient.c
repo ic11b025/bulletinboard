@@ -184,20 +184,22 @@ void connect_to_server() {
 }*/
 
 
-void close_conn(int sock, int mode)
+void close_conn(const int sd, const int mode)
 {
-	/*errno = 0;  			//beim Einsatz von errorhandling kommt immer "Bad File Descriptor"
-	if (shutdown(sock,mode) == -1){
-		fprintf(stderr, "%s\n", strerror(errno));
-	}*/
-	shutdown(sock,mode);
+	/* beim Einsatz von errorhandling kommt immer "Bad File Descriptor" */
+        printf("sd=%d\n", sd);
+        errno = 0;
+        if (shutdown(sd, mode) == -1) {
+            fprintf(stderr, "shutdown() error: %s\n", strerror(errno));
+	}
+	/*shutdown(sock,mode);*/
 }
 
-void write_to_serv(int sockfdwrite,const char *user, const char *message, const char *img_url)
+void write_to_serv(int sockfd, const char *user, const char *message, const char *img_url)
 {
 	FILE * fpwrite;
 	errno = 0;
-	if((fpwrite = fdopen(sockfdwrite, "w")) == NULL){
+	if((fpwrite = fdopen(sockfd, "w")) == NULL){
 		fprintf(stderr, "%s\n", strerror(errno));
 		exit(1);
 	}
@@ -214,7 +216,7 @@ void write_to_serv(int sockfdwrite,const char *user, const char *message, const 
 	if (fclose(fpwrite) == EOF){
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
-	close_conn(sockfdwrite,SHUT_WR);
+	close_conn(sockfd, SHUT_WR);
 }
 
 void read_from_serv(int sockfd)
@@ -243,36 +245,39 @@ int main(int argc, const char * const * argv)
     const char *user    = NULL;
     const char *message = NULL;
     const char *img_url = NULL;
-    int verbose         = 0;
-    int sockfd = 0;
-    int sockfdwrite = 0;
+    int verbose         = -1;
+    int sockfd          = -1;
+    int sockfd2         = -1;
 
     /* fill the const char *server, port, user, message, img_url and int verbose with data from command line */    
     smc_parsecommandline(argc, argv, *usagefunc, &server, &port, &user, &message, &img_url, &verbose);
 
     /* just debug info */
     fprintf(stdout, "von Commandline erhalten:\n"
-                    "server=%s\n"
-                    "port=%s\n"
-                    "user=%s\n"
-                    "message=%s\n"
-                    "img=%s\n"
-                    "verbose=%d\n\n", server, port, user, message, img_url, verbose);
+                    "\tserver = %s\n"
+                    "\tport   = %s\n"
+                    "\tuser   = %s\n"
+                    "\tmessage= %s\n"
+                    "\timg_url= %s\n"
+                    "\tverbose= %d\n\n", server, port, user, message, img_url, verbose);
 
     /* create structs with address information */
     
     if ((sockfd = get_server_info(server, port)) == -1) {
 		fprintf(stderr, "client: failed to connect\n");
 		return 1;
-	}
-	errno = 0;
-	
-	if ((sockfdwrite = dup(sockfd)) == -1){
-		fprintf(stderr, "%s\n", strerror(errno));
-		return 1;
-	}
-	write_to_serv(sockfdwrite, user, message, img_url);
-	read_from_serv(sockfd);
+    }
+    
+    errno = 0;
+    if ((sockfd2 = dup(sockfd)) == -1) {
+        fprintf(stderr, "%s\n", strerror(errno));
+        return 1;
+    }
+    printf("sockfd=%d\n", sockfd);
+    printf("sockfd2=%d\n", sockfd2);
+    write_to_serv(sockfd2, user, message, img_url);
+    
+    read_from_serv(sockfd);
 
 
     return(0);
