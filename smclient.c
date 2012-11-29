@@ -119,7 +119,7 @@ int get_server_info(const char * server, const char * port) {
     /* this loop goes throu the linked list, to catch all server addresses */
     for(p = servinfo; p != NULL; p = p->ai_next) {
         void *addr;
-        char *ipver;
+        char *ipver;   /* debug - print the IP version */
         /* get the pointer to the address itself,
            different fields in IPv4 and IPv6:      */
         if (p->ai_family == AF_INET) {     /* IPv4 */
@@ -131,38 +131,40 @@ int get_server_info(const char * server, const char * port) {
             addr = &(ipv6->sin6_addr);
             ipver = "IPv6";
         }
+
         /* debug info only */
         /* convert the IP address to a string and print it: */
         inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
-        printf("  %s: %s\n", ipver, ipstr);
-        printf("Port= %s\n", port);
+        printf("found %s address: %s Port: %s\n", ipver, ipstr, port);
     
         /* call socket(). Returns the socketnumber, required for connect() */
         errno  = 0;
         if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol)) != 0) {
         /* error handling and continue with next struct (ai_next) */
         perror("client: socket");
-        continue;
         }
 
+        /* now we call connect */
         if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sockfd);
             perror("client: connect");
-            continue;
+            continue;      /* go to ai_next, maybe we can connect there */
         }
-        break;
-   }
+        printf("break\n"); /* printf for debug */
+        break;             /* leave the for loop, because connect() did not report error */
+  } 
     
     if (p == NULL) {
         fprintf(stderr, "client: failed to connect\n");
-        return 2;
+        return 2;         /* the for loop did not find any address where we could connect - all tries have failed */
     }
     
-    /* now we are connected! Huhuu! */
     
+    /* now we are connected! Huhuu! */
+    printf("now connected!\n"); /* printf for debug */
     /* convert the IP address to a string and print it */
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr, sizeof ipstr);
-    printf("client: connecting to %s\n", ipstr);
+    printf("client: connected to %s : %s\n", ipstr, port);
 
     
     freeaddrinfo(servinfo); /* free the linked-list */
