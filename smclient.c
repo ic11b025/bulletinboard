@@ -33,6 +33,9 @@
 /*
 * --------------------------------------------------------------- defines --
 */
+
+#define BUFFLEN 100;
+
 /*
 * -------------------------------------------------------------- typedefs --
 */
@@ -155,8 +158,7 @@ int get_server_info(const char * server, const char * port) {
   } 
     
     if (p == NULL) {
-        fprintf(stderr, "client: failed to connect\n");
-        return 2;         /* the for loop did not find any address where we could connect - all tries have failed */
+        return -1;         /* the for loop did not find any address where we could connect - all tries have failed */
     }
     
     
@@ -166,9 +168,9 @@ int get_server_info(const char * server, const char * port) {
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr, sizeof ipstr);
     printf("client: connected to %s : %s\n", ipstr, port);
 
-    
+	printf("yea bitch");
     freeaddrinfo(servinfo); /* free the linked-list */
-    return 0;
+    return sockfd;
     /* htons();*/
 }
 
@@ -180,6 +182,46 @@ void connect_to_server() {
     inet_pton(AF_INET6, "2001:db8:63b3:1::3490", &(sa6.sin6_addr));  IPv6
 
 }*/
+
+
+void close_conn(int sock, int mode)
+{
+	errno = 0;
+	if (shutdown(sock,mode) == -1){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+}
+
+void write_to_serv(int sockfdwrite,const char *user, const char *message, const char *img_url)
+{
+	FILE * fpwrite;
+	errno = 0;
+	if((fpwrite = fdopen(sockfdwrite, "w")) == NULL){
+		fprintf(stderr, "%s\n", strerror(errno));
+		exit(1);
+	}
+	if(img_url == NULL)
+		fprintf(fpwrite,"user=%s\n%s\n",user,message);
+	else
+		fprintf(fpwrite,"user=%s\nimg=%s\n%s\n",user, img_url,message);
+	
+	errno = 0;
+	if (fflush(fpwrite) == EOF){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+	errno = 0;
+	if (fclose(fpwrite) == EOF){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+	close_conn(sockfdwrite,SHUT_WR);
+}
+
+void read_from_serv(int sockfd)
+{
+	sockfd = sockfd;
+}
+
+
 
 /**
 *
@@ -201,6 +243,8 @@ int main(int argc, const char * const * argv)
     const char *message = NULL;
     const char *img_url = NULL;
     int verbose         = 0;
+    int sockfd = 0;
+    int sockfdwrite = 0;
 
     /* fill the const char *server, port, user, message, img_url and int verbose with data from command line */    
     smc_parsecommandline(argc, argv, *usagefunc, &server, &port, &user, &message, &img_url, &verbose);
@@ -215,7 +259,19 @@ int main(int argc, const char * const * argv)
                     "verbose=%d\n\n", server, port, user, message, img_url, verbose);
 
     /* create structs with address information */
-    get_server_info(server, port);
+    /*get_server_info(server, port);*/
+    if ((sockfd = get_server_info(server, port)) == -1) {
+		fprintf(stderr, "client: failed to connect\n");
+		return 1;
+	}
+	errno = 0;
+	
+	if ((sockfdwrite = dup(sockfd)) == -1){
+		fprintf(stderr, "%s\n", strerror(errno));
+		return 1;
+	}
+	write_to_serv(sockfdwrite, user, message, img_url);
+	read_from_serv(sockfd);
 
 
     return(0);
