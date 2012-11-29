@@ -168,7 +168,7 @@ int get_server_info(const char * server, const char * port) {
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr, sizeof ipstr);
     printf("client: connected to %s : %s\n", ipstr, port);
 
-	printf("yea bitch");
+	
     freeaddrinfo(servinfo); /* free the linked-list */
     return sockfd;
     /* htons();*/
@@ -186,10 +186,11 @@ void connect_to_server() {
 
 void close_conn(int sock, int mode)
 {
-	errno = 0;
+	/*errno = 0;  			//beim Einsatz von errorhandling kommt immer "Bad File Descriptor"
 	if (shutdown(sock,mode) == -1){
 		fprintf(stderr, "%s\n", strerror(errno));
-	}
+	}*/
+	shutdown(sock,mode);
 }
 
 void write_to_serv(int sockfdwrite,const char *user, const char *message, const char *img_url)
@@ -259,7 +260,7 @@ int main(int argc, const char * const * argv)
                     "verbose=%d\n\n", server, port, user, message, img_url, verbose);
 
     /* create structs with address information */
-    /*get_server_info(server, port);*/
+    
     if ((sockfd = get_server_info(server, port)) == -1) {
 		fprintf(stderr, "client: failed to connect\n");
 		return 1;
