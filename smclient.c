@@ -34,7 +34,7 @@
 * --------------------------------------------------------------- defines --
 */
 
-#define BUFFLEN 100;
+#define BUFFLEN 100
 
 /*
 * -------------------------------------------------------------- typedefs --
@@ -219,7 +219,32 @@ void write_to_serv(int sockfdwrite,const char *user, const char *message, const 
 
 void read_from_serv(int sockfd)
 {
-	sockfd = sockfd;
+	char buffer[BUFFLEN];
+	FILE * fpread;
+	errno = 0;
+	if((fpread = fdopen(sockfd, "r")) == NULL){
+		fprintf(stderr, "%s\n", strerror(errno));
+		exit(1);
+	}
+	
+	
+	while (fgets(buffer, BUFFLEN, fpread) != NULL){
+		if (buffer[8] != '0'){
+			/*don't know what should happen*/
+		}
+		
+	}
+	
+	errno = 0;
+	if (fflush(fpread) == EOF){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+	errno = 0;
+	if (fclose(fpread) == EOF){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+	close_conn(sockfd,SHUT_RD);
+	
 }
 
 
@@ -272,7 +297,7 @@ int main(int argc, const char * const * argv)
 		return 1;
 	}
 	write_to_serv(sockfdwrite, user, message, img_url);
-	read_from_serv(sockfd);
+	/*read_from_serv(sockfd); ......has to be done*/
 
 
     return(0);
