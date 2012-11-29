@@ -108,7 +108,7 @@ int get_server_info(const char * server, const char * port) {
     memset(&hints, 0, sizeof hints); /* make sure the struct is empty */
     hints.ai_family = AF_UNSPEC;     /* IPv4 and IPv6 may be used */
     hints.ai_socktype = SOCK_STREAM; /* use TCP stream sockets */
-    hints.ai_flags = AI_PASSIVE;     /* fill in my IP for me */    
+    /*hints.ai_flags = AI_PASSIVE;*//*only for server*/     /* fill in my IP for me */    
     /* call getaddrinfo to fill the struct servinfo */
     if ((status = getaddrinfo(server, port, &hints, &servinfo)) != 0) {
     fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
