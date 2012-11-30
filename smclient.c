@@ -34,7 +34,8 @@
 * --------------------------------------------------------------- defines --
 */
 
-#define BUFFLEN 1000
+#define BUFFLEN 1024
+
 
 /*
 * -------------------------------------------------------------- typedefs --
@@ -221,14 +222,13 @@ void close_conn(FILE * fp, const int mode)
 void write_to_serv(const int sockfdwrite, const char *user, const char *message, const char *img_url)
 {
 	FILE * fpwrite;
-        int sd = -1;
 	
         errno = 0;
 	if((fpwrite = fdopen(sockfdwrite, "w")) == NULL){
 		fprintf(stderr, "%s\n", strerror(errno));
 		exit(1);
 	}
-        sd = fileno(fpwrite);
+ 
 	if(img_url == NULL)
 		fprintf(fpwrite,"user=%s\n%s\n",user,message);
 	else
@@ -240,34 +240,46 @@ void write_to_serv(const int sockfdwrite, const char *user, const char *message,
 void read_from_serv(const int sockfd)
 {
 	char buffer[BUFFLEN];
+	
 	FILE * fpread;
+	FILE * tmpfile;
+	
 	errno = 0;
 	if((fpread = fdopen(sockfd, "r")) == NULL){
 		fprintf(stderr, "%s\n", strerror(errno));
 		exit(1);
 	}
-/* Byteorder muss geändert werden!" */
-/* der Rest ist Unsinn */
-	
-	while (fgets(buffer, BUFFLEN, fpread) != NULL){
-		int i = 0;
-                fprintf(stdout, "%c", buffer[i++]);
-	}
-        
-        if (buffer[8] != '0'){
-                    /*don't know what should happen*/
-                    fprintf(stderr, "Server returned error status: %d", buffer[8]);
-        }
 
+	if((tmpfile = fopen("tempfile.txt","w+")) == NULL){
+		/*do error*/
+	}
+	while (fgets(buffer, BUFFLEN, fpread) != NULL){
+		fprintf(tmpfile,"%s",buffer);
+		printf("%d\n",strlen(buffer));
+	}
 	
-	errno = 0;
+	
+	
+	/*while (fread(&buffer,sizeof(char),BUFFLEN,fpread)){
+		fseek(tmpfile, 0, SEEK_END);
+		fwrite(&buffer,sizeof(char),BUFFLEN,tmpfile);
+		printf("%d\n",strlen(buffer));
+	}*/
+    
+    if(fclose(tmpfile) == EOF){
+		/*do error*/
+	}    
+	
+	/*if(remove("tempfile.txt") < 0)
+	{
+		//do error
+	}*/
+	
+	/*errno = 0;
 	if (fflush(fpread) == EOF){
 		fprintf(stderr, "%s\n", strerror(errno));
-	}
-	/*errno = 0;
-	if (fclose(fpread) == EOF){
-		fprintf(stderr, "%s\n", strerror(errno));
 	}*/
+	
 	close_conn(fpread, SHUT_RD);  /* close the read direction of the socket */
 
 	
@@ -297,7 +309,7 @@ int main(int argc, const char * const * argv)
     int verbose         = -1;
     int sockfd          = -1;
     int sockfd2         = -1;
-int i=0;
+
     /* fill the const char *server, port, user, message, img_url and int verbose with data from command line */    
     smc_parsecommandline(argc, argv, *usagefunc, &server, &port, &user, &message, &img_url, &verbose);
 
@@ -328,7 +340,7 @@ int i=0;
                 fprintf(stderr, "Fehler bei shutdown() in main: %s\n", strerror(errno));
         }
 */
-scanf("%d", &i); /*pause the process*/
+
 	read_from_serv(sockfd); /*......has to be done*/
 
 
