@@ -34,7 +34,7 @@
 * --------------------------------------------------------------- defines --
 */
 
-#define BUFFLEN 100;
+#define BUFFLEN 1000
 
 /*
 * -------------------------------------------------------------- typedefs --
@@ -92,11 +92,10 @@ void *get_in_addr(struct sockaddr *sa)
 *
 * \brief get address information about the server and connect
 *
-* \parm ?? - 
-* \parm 
-* \parm 
+* \parm const char *server - name/address of the server to which we want to connect 
+* \parm const char *port   - name/number of the port to which we want to connect
 *
-* \return ?
+* \return int - filedescriptor of the socket
 *
 */
 int get_server_info(const char * server, const char * port) {
@@ -174,33 +173,51 @@ int get_server_info(const char * server, const char * port) {
     /* htons();*/
 }
 
-/*
-void connect_to_server() {
-    struct sockaddr_in sa;  IPv4
-    struct sockaddr_in6 sa6;  IPv6
-    inet_pton(AF_INET, "192.0.2.1", &(sa.sin_addr));  IPv4
-    inet_pton(AF_INET6, "2001:db8:63b3:1::3490", &(sa6.sin6_addr));  IPv6
-
-}*/
-
-
-void close_conn(int sock, int mode)
+/**
+*
+* \brief close a socket. either read/write/both directions
+*
+* \parm const int sock - filedescriptor of the socket to be closed
+* \parm const int mode - SHUT_WR to close write only, SHUT_RD to close read only, 
+*                      - SHUT_RDWR to close both directions
+*
+* \return void
+*
+*/
+void close_conn(const int sock, const int mode)
 {
-	/*errno = 0;  			//beim Einsatz von errorhandling kommt immer "Bad File Descriptor"
-	if (shutdown(sock,mode) == -1){
-		fprintf(stderr, "%s\n", strerror(errno));
-	}*/
-	shutdown(sock,mode);
+	/* beim Einsatz von errorhandling kommt immer "Bad File Descriptor" */
+        printf("close_conn(): sock=%d\n", sock);
+        errno = 0;
+	if (shutdown(sock, mode) == -1) {
+		fprintf(stderr, "Fehler bei shutdown() : %s\n", strerror(errno));
+	}
+/*	shutdown(sock, mode);*/
 }
 
-void write_to_serv(int sockfdwrite,const char *user, const char *message, const char *img_url)
+/**
+*
+* \brief sends the data to the server, throu the socket
+*
+* \parm const int sockfdwrite - filedescriptor of the socket to be used for writing data
+* \parm const char *user      - name of the posting user
+* \parm const char *message   - message to be posted
+* \parm const char *img_url   - URL pointing to a picture of the posting user
+*
+* \return void
+*
+*/
+void write_to_serv(const int sockfdwrite, const char *user, const char *message, const char *img_url)
 {
 	FILE * fpwrite;
-	errno = 0;
+        int sd = -1;
+	
+        errno = 0;
 	if((fpwrite = fdopen(sockfdwrite, "w")) == NULL){
 		fprintf(stderr, "%s\n", strerror(errno));
 		exit(1);
 	}
+        sd = fileno(fpwrite);
 	if(img_url == NULL)
 		fprintf(fpwrite,"user=%s\n%s\n",user,message);
 	else
@@ -210,16 +227,45 @@ void write_to_serv(int sockfdwrite,const char *user, const char *message, const 
 	if (fflush(fpwrite) == EOF){
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
-	errno = 0;
-	if (fclose(fpwrite) == EOF){
+	
+        close_conn(sd, SHUT_WR);  /* close the write direction of the socket. Server will receive EOF */
+        errno = 0;
+	if (fclose(fpwrite) == EOF){  /* now close the FILE Pointer of the wirte direction */
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
-	close_conn(sockfdwrite,SHUT_WR);
 }
 
-void read_from_serv(int sockfd)
+void read_from_serv(const int sockfd)
 {
-	sockfd = sockfd;
+	char buffer[BUFFLEN];
+	FILE * fpread;
+	errno = 0;
+	if((fpread = fdopen(sockfd, "r")) == NULL){
+		fprintf(stderr, "%s\n", strerror(errno));
+		exit(1);
+	}
+	
+	while (fgets(buffer, BUFFLEN, fpread) != NULL){
+		int i = 0;
+                fprintf(stdout, "%c", buffer[i++]);
+	}
+        
+        if (buffer[8] != '0'){
+                    /*don't know what should happen*/
+                    fprintf(stderr, "Server returned error status: %d", buffer[8]);
+        }
+
+	
+	errno = 0;
+	if (fflush(fpread) == EOF){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+	errno = 0;
+	if (fclose(fpread) == EOF){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+	close_conn(sockfd, SHUT_RD);
+	
 }
 
 
@@ -243,36 +289,42 @@ int main(int argc, const char * const * argv)
     const char *user    = NULL;
     const char *message = NULL;
     const char *img_url = NULL;
-    int verbose         = 0;
-    int sockfd = 0;
-    int sockfdwrite = 0;
-
+    int verbose         = -1;
+    int sockfd          = -1;
+    int sockfd2         = -1;
+int i=0;
     /* fill the const char *server, port, user, message, img_url and int verbose with data from command line */    
     smc_parsecommandline(argc, argv, *usagefunc, &server, &port, &user, &message, &img_url, &verbose);
 
     /* just debug info */
-    fprintf(stdout, "von Commandline erhalten:\n"
-                    "server=%s\n"
-                    "port=%s\n"
-                    "user=%s\n"
-                    "message=%s\n"
-                    "img=%s\n"
-                    "verbose=%d\n\n", server, port, user, message, img_url, verbose);
+    fprintf(stdout, "von smc_parsecommandline erhalten:\n"
+                    "\tserver=%s\n"
+                    "\tport=%s\n"
+                    "\tuser=%s\n"
+                    "\tmessage=%s\n"
+                    "\timg=%s\n"
+                    "\tverbose=%d\n\n", server, port, user, message, img_url, verbose);
 
     /* create structs with address information */
-    
     if ((sockfd = get_server_info(server, port)) == -1) {
 		fprintf(stderr, "client: failed to connect\n");
 		return 1;
 	}
 	errno = 0;
 	
-	if ((sockfdwrite = dup(sockfd)) == -1){
+	if ((sockfd2 = dup(sockfd)) == -1){
 		fprintf(stderr, "%s\n", strerror(errno));
 		return 1;
 	}
-	write_to_serv(sockfdwrite, user, message, img_url);
-	read_from_serv(sockfd);
+	write_to_serv(sockfd2, user, message, img_url); /*send data to server */
+
+/*      errno = 0;
+        if (shutdown(sockfd, SHUT_WR) == -1) {
+                fprintf(stderr, "Fehler bei shutdown() in main: %s\n", strerror(errno));
+        }
+*/
+scanf("%d", &i); /*pause the process*/
+	read_from_serv(sockfd); /*......has to be done*/
 
 
     return(0);
