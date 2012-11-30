@@ -162,37 +162,48 @@ int get_server_info(const char * server, const char * port) {
     
     
     /* now we are connected! Huhuu! */
-    printf("now connected!\n"); /* printf for debug */
+    /* printf("now connected!\n"); *//* printf for debug */
     /* convert the IP address to a string and print it */
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr, sizeof ipstr);
     printf("client: connected to %s : %s\n", ipstr, port);
 
-	
     freeaddrinfo(servinfo); /* free the linked-list */
+    
     return sockfd;
-    /* htons();*/
 }
 
 /**
 *
 * \brief close a socket. either read/write/both directions
 *
-* \parm const int sock - filedescriptor of the socket to be closed
+* \parm const FILE *   - Filepointer to the socket to be closed
 * \parm const int mode - SHUT_WR to close write only, SHUT_RD to close read only, 
 *                      - SHUT_RDWR to close both directions
 *
 * \return void
 *
 */
-void close_conn(const int sock, const int mode)
+void close_conn(FILE * fp, const int mode)
 {
-	/* beim Einsatz von errorhandling kommt immer "Bad File Descriptor" */
-        printf("close_conn(): sock=%d\n", sock);
+        int sd = -1;
+        sd = fileno(fp); /* get the file descriptor which to close */
+        printf("close_conn(): sd to close=%d\n", sd);
+
         errno = 0;
-	if (shutdown(sock, mode) == -1) {
-		fprintf(stderr, "Fehler bei shutdown() : %s\n", strerror(errno));
-	}
-/*	shutdown(sock, mode);*/
+        if (fflush(fp) == EOF){   /* flush the buffer */
+                fprintf(stderr, "Fehler bei fflush() : %s\n", strerror(errno));
+        }
+
+        errno = 0;
+        if (shutdown(sd, mode) == -1) { /* close the socket descriptor */
+                fprintf(stderr, "Fehler bei shutdown() : %s\n", strerror(errno));
+        }
+
+        errno = 0;
+        if (fclose(fp) == EOF){  /* now cleanup the FILE Pointer */
+                fprintf(stderr, "Fehler bei fclose() : %s\n", strerror(errno));
+        }
+
 }
 
 /**
@@ -223,16 +234,7 @@ void write_to_serv(const int sockfdwrite, const char *user, const char *message,
 	else
 		fprintf(fpwrite,"user=%s\nimg=%s\n%s\n",user, img_url,message);
 	
-	errno = 0;
-	if (fflush(fpwrite) == EOF){
-		fprintf(stderr, "%s\n", strerror(errno));
-	}
-	
-        close_conn(sd, SHUT_WR);  /* close the write direction of the socket. Server will receive EOF */
-        errno = 0;
-	if (fclose(fpwrite) == EOF){  /* now close the FILE Pointer of the wirte direction */
-		fprintf(stderr, "%s\n", strerror(errno));
-	}
+        close_conn(fpwrite, SHUT_WR);  /* close the write direction of the socket. Server will receive EOF */
 }
 
 void read_from_serv(const int sockfd)
@@ -244,6 +246,8 @@ void read_from_serv(const int sockfd)
 		fprintf(stderr, "%s\n", strerror(errno));
 		exit(1);
 	}
+/* Byteorder muss geändert werden!" */
+/* der Rest ist Unsinn */
 	
 	while (fgets(buffer, BUFFLEN, fpread) != NULL){
 		int i = 0;
@@ -260,11 +264,12 @@ void read_from_serv(const int sockfd)
 	if (fflush(fpread) == EOF){
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
-	errno = 0;
+	/*errno = 0;
 	if (fclose(fpread) == EOF){
 		fprintf(stderr, "%s\n", strerror(errno));
-	}
-	close_conn(sockfd, SHUT_RD);
+	}*/
+	close_conn(fpread, SHUT_RD);  /* close the read direction of the socket */
+
 	
 }
 
