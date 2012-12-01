@@ -319,7 +319,7 @@ void read_from_serv(const int sockfd)
 				fprintf(htmlfile, "%s", buffer);
 			}else{
 				reccount++;
-				/*continue;*/
+				/*do not continue;*/
 			}
 			i += strlen(buffer);
                         /*fwrite(buffer, sizeof(char), filelen, htmlfile);
@@ -352,25 +352,28 @@ void read_from_serv(const int sockfd)
                                 exit(EXIT_FAILURE);
                         }
                         reccount++;
-                        continue;
+                        break;
+                }       /* continue;
                 }
 		if(reccount == 7){
-			/*do .png file; should be like segcount==4*/
-                        /* da passt was nicht ..... */
+                        
                         printf("7 : write PNG file content\n");
                         printf("PNG length = %ld\n", filelen);
                         
                         fwrite(buffer, sizeof(char), filelen, pngfile);
-                        /*continue;*/
+                      */  /*continue;*/
                         /*if(i<filelen){
                                 fprintf(pngfile, "%s", buffer);
                         }else{
                                 reccount++;
                                 continue;
                         }
-                        i += strlen(buffer);*/
-		}
+                        i += strlen(buffer);
+		}*/
 	}
+
+        fwrite(fpread, sizeof(char), filelen, pngfile);
+
 	
 	
 	
