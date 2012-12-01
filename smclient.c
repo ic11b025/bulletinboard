@@ -352,28 +352,27 @@ void read_from_serv(const int sockfd)
                                 exit(EXIT_FAILURE);
                         }
                         reccount++;
-                        break;
-                }       /* continue;
+        /*                break;
+                }*/       continue;
                 }
 		if(reccount == 7){
                         
                         printf("7 : write PNG file content\n");
-                        printf("PNG length = %ld\n", filelen);
-                        
+                        printf("PNG length = %ld\n", filelen);                      
                         fwrite(buffer, sizeof(char), filelen, pngfile);
-                      */  /*continue;*/
+                        break;  /*continue;*/
                         /*if(i<filelen){
                                 fprintf(pngfile, "%s", buffer);
                         }else{
                                 reccount++;
                                 continue;
                         }
-                        i += strlen(buffer);
-		}*/
+                        i += strlen(buffer);*/
+		}
 	}
-
+/*
         fwrite(fpread, sizeof(char), filelen, pngfile);
-
+*/
 	
 	
 	
