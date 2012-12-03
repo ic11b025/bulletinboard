@@ -115,7 +115,7 @@ int get_server_info(const char * server, const char * port) {
     /* call getaddrinfo to fill the struct servinfo */
     if ((status = getaddrinfo(server, port, &hints, &servinfo)) != 0) {
     fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-    exit(1);
+    exit(EXIT_FAILURE);
     }
 /* servinfo now points to a linked list of 1 or more struct addrinfo */
 
@@ -222,18 +222,18 @@ void close_conn(FILE * fp, const int mode)
 void write_to_serv(const int sockfdwrite, const char *user, const char *message, const char *img_url)
 {
 	FILE * fpwrite;
-	
-        errno = 0;
+
+    errno = 0;
 	if((fpwrite = fdopen(sockfdwrite, "w")) == NULL){
 		fprintf(stderr, "%s\n", strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
  
 	if(img_url == NULL)
 		fprintf(fpwrite,"user=%s\n%s\n",user,message);
 	else
 		fprintf(fpwrite,"user=%s\nimg=%s\n%s\n",user, img_url,message);
-	
+
         close_conn(fpwrite, SHUT_WR);  /* close the write direction of the socket. Server will receive EOF */
 }
 
@@ -241,15 +241,14 @@ void read_from_serv(const int sockfd)
 {
 	char buffer[BUFFLEN];
 	FILE * fpread  = NULL;
-	/*FILE * tmpfile;*/
 	FILE *htmlfile = NULL;
-        FILE *pngfile  = NULL;
+    FILE *pngfile  = NULL;
 	int reccount   = 1;
 	unsigned int i = 0;
 	char *len      = NULL;
 	long filelen   = 0;
 	char *htmlname = NULL;
-        char *pngname  = NULL;
+    char *pngname  = NULL;
 
 	errno = 0;
 	if((fpread = fdopen(sockfd, "r")) == NULL){
@@ -257,14 +256,9 @@ void read_from_serv(const int sockfd)
 		exit(1);
 	}
 
-	/*if((tmpfile = fopen("tempfile.txt","w+")) == NULL){
-		//do error
-	}*/
 	while (fgets(buffer, BUFFLEN, fpread) != NULL){  /* fgets() reads until linefeed or EOF */
-		/*fprintf(tmpfile,"%s",buffer);*/
-		/*printf("%d\n",strlen(buffer));*/
 		if(reccount == 1){
-			printf("record 1 : status code from server : %c\n", buffer[7]);
+			printf("record 1 : status code from server : %c\n", buffer[7]); /*debuginfo*/
 			if (strncmp(buffer, "status=0", 8) != 0) { /* check the status returned by the server */
                                 fprintf(stderr, "Server returned error status %c\nexiting!\n", buffer[7]);
                                 exit(EXIT_FAILURE);
@@ -273,38 +267,39 @@ void read_from_serv(const int sockfd)
 			continue;
 		}
 		if(reccount == 2){
-			printf("record 2 : filename for HTML content\n");
-                        if (strncmp(buffer, "file=", 5) != 0) {
-                                /*do error*/
-                                fprintf(stderr, "cannot determine filename for HTML content in the servers response\nexiting!\n");
-                                exit(EXIT_FAILURE);
+			printf("record 2 : filename for HTML content\n"); /*debuginfo*/
+            if (strncmp(buffer, "file=", 5) != 0) {
+				fprintf(stderr, "cannot determine filename for HTML content in the servers response\nexiting!\n");
+                exit(EXIT_FAILURE);
 
-                        }
+            }
 			htmlname = malloc((strlen(buffer)-6) * sizeof(char));
-			printf("htmlname länge = %d\n", (int)strlen(buffer));
+			if(htmlname == NULL)
+				fprintf(stderr, "Fehler malloc vom HTML-File\n");
+			printf("htmlname länge = %d\n", (int)strlen(buffer)); /*debuginfo*/
 			for(i=5;i<(strlen(buffer)-1);i++){
-				printf("i=%d : ",i);
+				printf("i=%d : ",i); /*debuginfo*/
 				htmlname[i-5] = buffer[i];
-				printf("%c = %c\n",htmlname[i-5], buffer[i]);
+				printf("%c = %c\n",htmlname[i-5], buffer[i]); /*debuginfo*/
 			}
-			printf("record 2 vorbei\n");
+			printf("record 2 vorbei\n"); /*debuginfo*/
 			if((htmlfile = fopen(htmlname,"w+")) ==  NULL) {
-                                fprintf(stderr, "cannot open file %s to write HTML content\n"
-                                                "check for write permission in directory\n"
-                                                "exiting!\n", htmlname);
-                                exit(EXIT_FAILURE);
+				fprintf(stderr, "cannot open file %s to write HTML content\n"
+                                "check for write permission in directory\n"
+                                "exiting!\n", htmlname);
+                exit(EXIT_FAILURE);
 			}
 			reccount++;
 			continue;
 		}
 		if(reccount == 3 || reccount == 6){ /*length of html or png file*/
-                        if (strncmp(buffer, "len=", 4) != 0) {
-                                /*do error*/
-                                fprintf(stderr, "cannot determine content length in the servers response\nexiting!\n");
-                                exit(EXIT_FAILURE);
-
-                        }
+			if (strncmp(buffer, "len=", 4) != 0) {
+				fprintf(stderr, "cannot determine content length in the servers response\nexiting!\n");
+				exit(EXIT_FAILURE);
+			}
 			len = malloc((strlen(buffer)-5) * sizeof(char));
+			if(len == NULL)
+				fprintf(stderr,"Fehler beim malloc von File-Länge\n");
 			for(i=4;i<(strlen(buffer)-1);i++){
 				len[i-4] = buffer[i];
 			}
@@ -314,98 +309,68 @@ void read_from_serv(const int sockfd)
 			continue;
 		}
 		if(reccount == 4){
-			/*fseek(htmlfile, 0, SEEK_END);*/
 			if(i<filelen){
 				fprintf(htmlfile, "%s", buffer);
 			}else{
 				reccount++;
-				/*do not continue;*/
 			}
 			i += strlen(buffer);
-                        /*fwrite(buffer, sizeof(char), filelen, htmlfile);
-		        reccount++;
-                        continue;*/
-                }
-		if(reccount == 5)
-		{
-			/*file=ok.png*/
-			/*printf("%s", buffer);*/
-                        printf("record 5 : PNG Filename\n");
-                        if (strncmp(buffer, "file=", 5) != 0) {
-                             
-                                fprintf(stderr, "cannot determine filename for PNG content in the servers response\nexiting!\n");
-                                exit(EXIT_FAILURE);
-                        }
-                        pngname = malloc((strlen(buffer)-6) * sizeof(char));
-                        printf("pngname länge = %d\n", (int)strlen(buffer));
-                        for (i=5; i < (strlen(buffer)-1); i++) {
-                                printf("i=%d : ",i);
-                                pngname[i-5] = buffer[i];
-                                printf("%c = %c\n",pngname[i-5], buffer[i]);
-                        }
-                        printf("record 5 vorbei\n");
-                        if((pngfile = fopen(pngname,"w+")) ==  NULL){
-                                /*do error*/
-                                fprintf(stderr, "cannot open file %s to write PNG content\n"
-                                                "check for write permission in directory\n"
-                                                "exiting!\n", pngname);
-                                exit(EXIT_FAILURE);
-                        }
-                        reccount++;
-        /*                break;
-                }*/       continue;
-                }
-		if(reccount == 7){
-                        
-                        printf("7 : write PNG file content\n");
-                        printf("PNG length = %ld\n", filelen);                      
-                        fwrite(buffer, sizeof(char), filelen, pngfile);
-                        break;  /*continue;*/
-                        /*if(i<filelen){
+        }
+		if(reccount == 5){
+			printf("record 5 : PNG Filename\n"); /*debuginfo*/
+            if (strncmp(buffer, "file=", 5) != 0) {            
+				fprintf(stderr, "cannot determine filename for PNG content in the servers response\nexiting!\n");
+                exit(EXIT_FAILURE);
+            }
+            pngname = malloc((strlen(buffer)-6) * sizeof(char));
+            if(pngname == NULL)
+				fprintf(stderr,"Fehler beim malloc von png-File");
+            printf("pngname länge = %d\n", (int)strlen(buffer)); /*debuginfo*/
+            for (i=5; i < (strlen(buffer)-1); i++) {
+				printf("i=%d : ",i); /*debuginfo*/
+                pngname[i-5] = buffer[i];
+                printf("%c = %c\n",pngname[i-5], buffer[i]); /*debuginfo*/
+            }
+            printf("record 5 vorbei\n"); /*debuginfo*/
+            if((pngfile = fopen(pngname,"w+")) ==  NULL){
+				fprintf(stderr, "cannot open file %s to write PNG content\n"
+                                "check for write permission in directory\n"
+                                "exiting!\n", pngname);
+                 exit(EXIT_FAILURE);
+            }
+            reccount++;
+            continue;
+        }
+		if(reccount == 7){              
+			printf("7 : write PNG file content\n"); /*debuginfo*/
+            printf("PNG length = %ld\n%d\n", filelen,i);  /*debuginfo*/
+                     
+            fwrite(buffer, sizeof(char), filelen, pngfile);
+            break;
+            /*fseek(pngfile,0,SEEK_END);
+            fprintf(pngfile, "%s", buffer);
+            printf("buffer = %d\n", strlen(buffer));*/
+                  /*<=filelen){
                                 fprintf(pngfile, "%s", buffer);
                         }else{
                                 reccount++;
                                 continue;
+                                 
                         }
                         i += strlen(buffer);*/
 		}
-	}
-/*
-        fwrite(fpread, sizeof(char), filelen, pngfile);
-*/
-	
-	
-	
-	/*while (fread(&buffer,sizeof(char),BUFFLEN,fpread)){
-		fseek(tmpfile, 0, SEEK_END);
-		fwrite(&buffer,sizeof(char),BUFFLEN,tmpfile);
-		printf("%d\n",strlen(buffer));
-	}*/
-    
-    /*if(fclose(tmpfile) == EOF){
-		//do error
-	} */   
-	
-	/*if(remove("tempfile.txt") < 0)
-	{
-		//do error
-	}*/
-	
+	}   
+	errno = 0;
 	if(fclose(htmlfile) == EOF){
-		/*do error*/
-	}
-	
-	/*errno = 0;
-	if (fflush(fpread) == EOF){
 		fprintf(stderr, "%s\n", strerror(errno));
-	}*/
-	
+	}
+	errno = 0;
+	if(fclose(pngfile) == EOF){
+		fprintf(stderr, "%s\n", strerror(errno));
+	}
+
 	close_conn(fpread, SHUT_RD);  /* close the read direction of the socket */
-
-	
 }
-
-
 
 /**
 *
@@ -448,21 +413,14 @@ int main(int argc, const char * const * argv)
 		return 1;
 	}
 	errno = 0;
-	
+
 	if ((sockfd2 = dup(sockfd)) == -1){
 		fprintf(stderr, "%s\n", strerror(errno));
 		return 1;
 	}
 	write_to_serv(sockfd2, user, message, img_url); /*send data to server */
 
-/*      errno = 0;
-        if (shutdown(sockfd, SHUT_WR) == -1) {
-                fprintf(stderr, "Fehler bei shutdown() in main: %s\n", strerror(errno));
-        }
-*/
-
-	read_from_serv(sockfd); /*......has to be done*/
-
+	read_from_serv(sockfd);
 
     return(0);
 }
@@ -470,3 +428,4 @@ int main(int argc, const char * const * argv)
 /*
 * =================================================================== eof ==
 */
+
