@@ -309,7 +309,8 @@ void read_from_serv(const int sockfd)
 			for(i=4;i<(strlen(buffer)-1);i++){
 				len[i-4] = buffer[i];
 			}
-			filelen = atol(len);
+			/*filelen = atol(len);*/ /* todo: change atol() to strtol() */
+                        filelen = strtol(len, (char **) NULL, 10);
 			i=0;
 			if (reccount == 6) { 
 				free(len);  /* free memory allocated for array only when len will not be rallocated */
