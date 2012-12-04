@@ -188,7 +188,7 @@ void close_conn(FILE * fp, const int mode)
 {
         int sd = -1;
         sd = fileno(fp); /* get the file descriptor which to close */
-        printf("close_conn(): sd to close=%d\n", sd);
+        printf("close_conn(): sd to close=%d\n", sd); /* debug info only */
 
         errno = 0;
         if (fflush(fp) == EOF){   /* flush the buffer */
@@ -223,7 +223,7 @@ void write_to_serv(const int sockfdwrite, const char *user, const char *message,
 {
 	FILE * fpwrite;
 
-    errno = 0;
+        errno = 0;
 	if((fpwrite = fdopen(sockfdwrite, "w")) == NULL){
 		fprintf(stderr, "%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
@@ -242,13 +242,13 @@ void read_from_serv(const int sockfd)
 	char buffer[BUFFLEN];
 	FILE * fpread  = NULL;
 	FILE *htmlfile = NULL;
-    FILE *pngfile  = NULL;
+        FILE *pngfile  = NULL;
 	int reccount   = 1;
 	unsigned int i = 0;
 	char *len      = NULL;
 	long filelen   = 0;
 	char *htmlname = NULL;
-    char *pngname  = NULL;
+        char *pngname  = NULL;
 
 	errno = 0;
 	if((fpread = fdopen(sockfd, "r")) == NULL){
@@ -257,6 +257,8 @@ void read_from_serv(const int sockfd)
 	}
 
 	while (fgets(buffer, BUFFLEN, fpread) != NULL){  /* fgets() reads until linefeed or EOF */
+       /* while (buffer = fgetc(fpread) != NULL){*/  /* fgetc() reads until EOF */
+
 		if(reccount == 1){
 			printf("record 1 : status code from server : %c\n", buffer[7]); /*debuginfo*/
 			if (strncmp(buffer, "status=0", 8) != 0) { /* check the status returned by the server */
@@ -289,7 +291,8 @@ void read_from_serv(const int sockfd)
                                 "exiting!\n", htmlname);
                 exit(EXIT_FAILURE);
 			}
-			reccount++;
+			free(htmlname); /* free memory allocated for array */
+                        reccount++;
 			continue;
 		}
 		if(reccount == 3 || reccount == 6){ /*length of html or png file*/
@@ -297,14 +300,20 @@ void read_from_serv(const int sockfd)
 				fprintf(stderr, "cannot determine content length in the servers response\nexiting!\n");
 				exit(EXIT_FAILURE);
 			}
+                        if ( len != NULL ) {
+                        len = realloc((void*)len, (strlen(buffer)-5) * sizeof(char));
+                        }
+                        else {
 			len = malloc((strlen(buffer)-5) * sizeof(char));
-			if(len == NULL)
+			}
+                        if(len == NULL)
 				fprintf(stderr,"Fehler beim malloc von File-Länge\n");
 			for(i=4;i<(strlen(buffer)-1);i++){
 				len[i-4] = buffer[i];
 			}
 			filelen = atol(len);
-			reccount++;
+			if (reccount == 6) { free(len); } /* free memory allocated for array only when len will not be rallocated */
+                        reccount++;
 			i=0;
 			continue;
 		}
@@ -338,6 +347,7 @@ void read_from_serv(const int sockfd)
                                 "exiting!\n", pngname);
                  exit(EXIT_FAILURE);
             }
+            free(pngname); /* free memory allocated for array */
             reccount++;
             continue;
         }
