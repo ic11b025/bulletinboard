@@ -53,15 +53,15 @@
 *
 * \brief prints the usage information and exits
 *
-* \parm stream - stream where to write the usage (stderr)
-* \parm executable - name of the executed file
-* \parm exitcode - exit code for termination
+* \parm FILE * stream   - stream where to write the usage (stderr)
+* \parm const char *cmd - name of the executed file
+* \parm int exitcode    - exit code for termination
 *
-* \return EXIT_FAILURE
+* \return failure in all cases
 *
 */
 void usagefunc(FILE * stream, const char * cmd, int exitcode) {
-	fprintf(stream, "usage: %s\noptions:\n", cmd);
+	fprintf(stream, "usage:\n%s <options>\noptions:\n", cmd);
 	fprintf(stream, "    -s, --server <server>   hostname, full qualified domain name or IP address of the server\n");
 	fprintf(stream, "    -p, --port <port>       TCP port of the server [0..65535]\n");
 	fprintf(stream, "    -u, --user <name>       name of the posting user\n");
@@ -138,11 +138,11 @@ int get_server_info(const char * server, const char * port) {
         /* debug info only */
         /* convert the IP address to a string and print it: */
         inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
-        printf("found %s address: %s Port: %s\n", ipver, ipstr, port);
+        printf("ai_family=%d and found %s address: %s Port: %s\n", p->ai_family, ipver, ipstr, port);
     
         /* call socket(). Returns the socketnumber, required for connect() */
         errno  = 0;
-        if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol)) != 0) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) != 0) {
         /* error handling and continue with next struct (ai_next) */
         perror("client: socket");
         }
@@ -163,7 +163,6 @@ int get_server_info(const char * server, const char * port) {
     
     
     /* now we are connected! Huhuu! */
-    /* printf("now connected!\n"); *//* printf for debug */
     /* convert the IP address to a string and print it */
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr, sizeof ipstr);
     printf("client: connected to %s : %s\n", ipstr, port);
@@ -177,8 +176,9 @@ int get_server_info(const char * server, const char * port) {
 *
 * \brief close a socket. either read/write/both directions
 *
-* \parm const FILE *   - Filepointer to the socket to be closed
-* \parm const int mode - SHUT_WR to close write only, SHUT_RD to close read only, 
+* \parm FILE *         - Filepointer to the socket to be closed
+* \parm const int mode - SHUT_WR to close write only
+*                      - SHUT_RD to close read only
 *                      - SHUT_RDWR to close both directions
 *
 * \return void
@@ -204,7 +204,6 @@ void close_conn(FILE * fp, const int mode)
         if (fclose(fp) == EOF){  /* now cleanup the FILE Pointer */
                 fprintf(stderr, "Fehler bei fclose() : %s\n", strerror(errno));
         }
-
 }
 
 /**
@@ -253,11 +252,10 @@ void read_from_serv(const int sockfd)
 	errno = 0;
 	if((fpread = fdopen(sockfd, "r")) == NULL){
 		fprintf(stderr, "%s\n", strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	while (fgets(buffer, BUFFLEN, fpread) != NULL){  /* fgets() reads until linefeed or EOF */
-       /* while (buffer = fgetc(fpread) != NULL){*/  /* fgetc() reads until EOF */
 
 		if(reccount == 1){
 			printf("record 1 : status code from server : %c\n", buffer[7]); /*debuginfo*/
@@ -312,9 +310,12 @@ void read_from_serv(const int sockfd)
 				len[i-4] = buffer[i];
 			}
 			filelen = atol(len);
-			if (reccount == 6) { free(len); } /* free memory allocated for array only when len will not be rallocated */
-                        reccount++;
 			i=0;
+			if (reccount == 6) { 
+				free(len);  /* free memory allocated for array only when len will not be rallocated */
+				break;      /* now stop using fgets(), because we want to recveice binary data for the png file */ 
+			}
+                        reccount++;
 			continue;
 		}
 		if(reccount == 4){
@@ -351,31 +352,28 @@ void read_from_serv(const int sockfd)
             reccount++;
             continue;
         }
-		if(reccount == 7){              
-			printf("7 : write PNG file content\n"); /*debuginfo*/
-            printf("PNG length = %ld\n%d\n", filelen,i);  /*debuginfo*/
-                     
-            fwrite(buffer, sizeof(char), filelen, pngfile);
-            break;
-            /*fseek(pngfile,0,SEEK_END);
-            fprintf(pngfile, "%s", buffer);
-            printf("buffer = %d\n", strlen(buffer));*/
-                  /*<=filelen){
-                                fprintf(pngfile, "%s", buffer);
-                        }else{
-                                reccount++;
-                                continue;
-                                 
-                        }
-                        i += strlen(buffer);*/
-		}
+		
 	}   
+	/* now the binary content for the png file is read from the filepointer */
+	while (i<filelen){
+		if(i+BUFFLEN>filelen){
+			fread(&buffer,sizeof(char), filelen - i, fpread);
+			fwrite(&buffer,sizeof(char), filelen - i, pngfile);
+		} else {
+			fread(&buffer,sizeof(char), BUFFLEN, fpread);
+			fwrite(&buffer,sizeof(char), BUFFLEN, pngfile);
+		}
+		
+		i+=BUFFLEN;
+	}
+	
+	
 	errno = 0;
-	if(fclose(htmlfile) == EOF){
+	if(fclose(htmlfile) == EOF){ /* close the HTML file */
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
 	errno = 0;
-	if(fclose(pngfile) == EOF){
+	if(fclose(pngfile) == EOF){ /* close the PNG file */
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
 
@@ -420,22 +418,21 @@ int main(int argc, const char * const * argv)
     /* create structs with address information */
     if ((sockfd = get_server_info(server, port)) == -1) {
 		fprintf(stderr, "client: failed to connect\n");
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 	errno = 0;
 
-	if ((sockfd2 = dup(sockfd)) == -1){
+	if ((sockfd2 = dup(sockfd)) == -1){             /* duplicate the socketdescriptor */
 		fprintf(stderr, "%s\n", strerror(errno));
-		return 1;
+		exit(EXIT_FAILURE);
 	}
-	write_to_serv(sockfd2, user, message, img_url); /*send data to server */
+	write_to_serv(sockfd2, user, message, img_url); /* send request to server */
 
-	read_from_serv(sockfd);
+	read_from_serv(sockfd);                         /* receive response from server */
 
-    return(0);
+    exit(EXIT_SUCCESS);
 }
 
 /*
 * =================================================================== eof ==
 */
-
