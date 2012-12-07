@@ -1,12 +1,12 @@
 ##
 ## @file Makefile
-## Betriebssysteme Aufgabe 2 Makefile
+## Betriebssysteme Aufgaben 2,3,4 Makefile
 ##
 ## @author Mihajlo Milanovic   <ic11b081@technikum-wien.at>
 ## @author Roland Hochreiter   <ic11b025@technikum-wien.at>
-## @date 2012/11/27
+## @date 2012/12/07
 ##
-## @version $Revision: 001 $
+## @version $Revision: 002 $
 ##
 ## URL: $HeadURL$
 ##
@@ -22,7 +22,8 @@ CFLAGS := -I/usr/local/include -Wall -Wextra -Werror -pedantic -g -O3
 RM := rm -f
 DOXYGEN := doxygen
 
-OBJECTCLIENT := smclient.o
+OBJECTCLIENT := simple_message_client_1404.o
+OBJECTSERVER := simple_message_server_1404.o
 
 ##
 ## ----------------------------------------------------------------- rules --
@@ -35,18 +36,22 @@ OBJECTCLIENT := smclient.o
 ## --------------------------------------------------------------- targets --
 ##
 
-all: smclient
+all: client server
 
-smclient: $(OBJECTCLIENT)
+client: $(OBJECTCLIENT)
 	$(CC) $(CFLAGS) -o $@ $^ -lsimple_message_client_commandline_handling
 
+server: $(OBJECTSERVER)
+	$(CC) $(CFLAGS) -o $@ $^
+
 clean:
-	$(RM) $(OBJECTCLIENT) smclient
+	$(RM) $(OBJECTCLIENT) $(OBJECTSERVER) client server
 
 distclean: clean
 	$(RM) -r doc
 
 doc:
+	$(CC) $(CFLAGS) -c $<
 	$(DOXYGEN) doxygen.dcf
 
 ##
