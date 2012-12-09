@@ -37,6 +37,7 @@
 */
 
 #define BACKLOG 10   /* how many pending connections queue will hold */
+#define PATHBULOGIC "/usr/local/bin/simple_message_server_logic" /*the path of the business_logic*/
 
 /*
 * -------------------------------------------------------------- typedefs --
@@ -80,35 +81,12 @@ void usagefunc(const char * cmd) {
 	exit(EXIT_FAILURE);
 }
 
-/**
-*
-* \brief implements the message server, which spawn the buisness logic process
-*
-* This is the main entry point for any C program.
-*
-* \param argc the number of arguments
-* \param argv the arguments itselves (including the program name in argv[0])
-*
-* \return success or failure
-*
-*/
-
-int main(int argc, const char * const * argv)
-{
-    char *endptrstrtol  = NULL;
-    char s[INET6_ADDRSTRLEN];
-    long lport          = -1;
-    int sockfd          = -1;  /* listen on sockfd */
-    int sockfdchild     = -1;  /* new connection on sockfdchild */
-    struct addrinfo hints, *servinfo, *p;
-    struct sockaddr_storage their_addr; /* client's address information */
-    struct sigaction sa;
-    socklen_t sin_size  = -1;
-    int yes             =  1;
-    int rv              = -1;
-    
+void parse_commandline(int argc, const char * const * argv){
+	
+	char *endptrstrtol  = NULL;
+	long lport          = -1;
     /* parse the commandline */
-    if (argc != 3) {
+    if (argc != 3) {  /*if using "-h" it will not work......*/
             fprintf(stderr, "Fehler: argc = %d\n", argc);
     	    usagefunc(argv[0]);
     } else {
@@ -117,19 +95,20 @@ int main(int argc, const char * const * argv)
                     usagefunc(argv[0]);
     	    } else {
     	    	    lport = strtol(argv[2], &endptrstrtol, 10);
-                    if (lport < 0 || lport > 65535) {
-                       fprintf(stderr, "Fehler: Port ist zu hoch : %ld\n", lport);
-                       usagefunc(argv[0]);
-                    }
-                    fprintf(stderr, "Debug: Portnummer von strtol() = %ld\n", lport);
-    	    	    if ((errno == ERANGE && (lport == LONG_MAX || lport == LONG_MIN)) || (errno != 0)) {
+                    
+    	    	if ((errno == ERANGE && (lport == LONG_MAX || lport == LONG_MIN)) || (errno != 0)) {
         			fprintf(stderr, "%s\n",strerror(errno));
         			usagefunc(argv[0]);
     			}
-   		     if (endptrstrtol == argv[2]) {
+				if (endptrstrtol == argv[2]) {
         			fprintf(stderr, "No digits were found\n");
         			usagefunc(argv[0]);
     			}
+    			if (lport < 0 || lport > 65535) {
+                       fprintf(stderr, "Fehler: Port ist zu hoch : %ld\n", lport);
+                       usagefunc(argv[0]);
+                }
+                    fprintf(stderr, "Debug: Portnummer von strtol() = %ld\n", lport);
             /* argv[2] is a valid number from 0 to 65535 */
     	    }
     }
@@ -138,8 +117,17 @@ int main(int argc, const char * const * argv)
                     "\tstring argv[2] = %s\n"
                     "\tlong port      = %ld\n"
                     , argv[2], lport);
-    
-    memset(&hints, 0, sizeof hints);
+
+}
+
+int get_port(int sockfd, const char * const * argv){
+
+struct addrinfo hints, *servinfo, *p;
+struct sigaction sa;
+int yes             =  1;
+    int rv              = -1;
+
+memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;        /* IPv4 and IPv6 supported */
     hints.ai_socktype = SOCK_STREAM;    /* TCP */
     hints.ai_flags = AI_PASSIVE;        /* use my IP address */
@@ -187,6 +175,40 @@ int main(int argc, const char * const * argv)
         exit(1);
     }
     fprintf(stderr, "server: waiting for connections...\n");
+    return sockfd;
+
+}
+
+/**
+*
+* \brief implements the message server, which spawn the buisness logic process
+*
+* This is the main entry point for any C program.
+*
+* \param argc the number of arguments
+* \param argv the arguments itselves (including the program name in argv[0])
+*
+* \return success or failure
+*
+*/
+
+int main(int argc, const char * const * argv)
+{
+    
+    char s[INET6_ADDRSTRLEN];
+    
+    int sockfd          = -1;  /* listen on sockfd */
+    int sockfdchild     = -1;  /* new connection on sockfdchild */
+    struct sockaddr_storage their_addr; /* client's address information */
+    socklen_t sin_size  = -1;
+    pid_t pid = -1, waitPID = -1;
+    int state = 0;
+    
+    parse_commandline(argc,argv);
+    
+	sockfd = get_port(sockfd, argv);
+    
+    
     while(1) {  /* loop to accept() connections */
         sin_size = sizeof their_addr;
         sockfdchild = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
@@ -197,16 +219,47 @@ int main(int argc, const char * const * argv)
 
         inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof s); /* get information about the connected client */
         fprintf(stderr, "server: got connection from %s\n", s);
-
-        /* todo: exec() the buisness_logic instead of fork() */
-        if (!fork()) { /* now fork new process */ /* the child process enters this block*/
-            close(sockfd); /* child doesn't need the listener */
-            if (send(sockfdchild, "status=0\nfile=duDockn\nHallo du Sockn,\n das ist super!\b\b\n", 13, 0) == -1)
-                perror("send");
-            close(sockfdchild);      /* todo: besser shutdown() verwenden */
-            exit(0);
-        }
-        close(sockfdchild);  /* parent doesn't need this */
+        
+       switch (pid = fork())
+       {
+		   case -1: { /*error*/
+					close(sockfdchild);
+					close(sockfd);
+					fprintf(stderr,"error after forking");
+					exit(1);
+					break;
+			}
+		   case 0:{/*child process*/
+					close(sockfd);
+					if (dup2(sockfdchild,0) == -1){ /*Umwandeln stdin*/
+						close(sockfdchild);
+						exit(EXIT_FAILURE);
+					}
+					if (dup2(sockfdchild,1) == -1){ /*Umwandeln stdout*/
+						close(sockfdchild);
+						exit(EXIT_FAILURE);
+					}
+					(void) execlp(PATHBULOGIC,"simple_message_server_logic" ,NULL);
+					exit(EXIT_FAILURE);
+					break;
+		   }
+		   default:{ /*mother process*/
+					close(sockfdchild);  /* parent doesn't need this */
+					while ((waitPID = waitpid(pid, &state, 0)) != pid)
+					{
+						if (waitPID == -1){
+							if (errno == EINTR){
+								continue;      
+							}
+						errno = ECHILD;    
+						}
+					}
+    
+					if (!WIFEXITED(state)){			
+						fprintf(stderr,"Child with PID:%d did not exit normally", waitPID);
+					}
+			}
+	   }  
     }
     exit(EXIT_SUCCESS);
 }
