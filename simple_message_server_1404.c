@@ -1,14 +1,14 @@
 /**
 * @file smserver.c
-* Betriebssysteme Aufgabe 3??4?? - simple message server
+* Betriebssysteme Aufgaben 2 bis 4 - simple message server
 *
 * @author Roland Hochreiter   <ic11b025@technikum-wien.at>
 * @author Mihajlo Milanovic   <ic11b081@technikum-wien.at>
-* @date 2012/12/06
+* @date 2012/12/10
 *
 * @version $Revision: 001 $
 *
-* @todo - alles
+* @todo - remove debug printf(), add doxygen Kommentare
 *
 * URL: $HeadURL$
 *
@@ -37,7 +37,7 @@
 */
 
 #define BACKLOG 10   /* how many pending connections queue will hold */
-#define PATHBULOGIC "bla/usr/local/bin/simple_message_server_logic" /*the path of the business_logic*/
+#define PATHBULOGIC "/usr/local/bin/simple_message_server_logic" /*the path of the business_logic*/
 
 /*
 * -------------------------------------------------------------- typedefs --
@@ -191,7 +191,6 @@ memset(&hints, 0, sizeof hints);
 * \return success or failure
 *
 */
-
 int main(int argc, const char * const * argv)
 {
     
@@ -201,8 +200,7 @@ int main(int argc, const char * const * argv)
     int sockfdchild     = -1;  /* new connection on sockfdchild */
     struct sockaddr_storage their_addr; /* client's address information */
     socklen_t sin_size  = -1;
-    pid_t pid = -1, waitPID = -1;
-    int state = 0;
+    pid_t pid = -1;
     
     parse_commandline(argc,argv);
     
@@ -240,30 +238,13 @@ int main(int argc, const char * const * argv)
 						exit(EXIT_FAILURE);
 					}
                                         errno = 0;
-                                        if ( execlp(PATHBULOGIC,"simple_message_server_logic" ,NULL) == -1) {
-                                                fprintf(stderr, "execlp() failed: %s", strerror(errno));
-                                                exit(EXIT_FAILURE);
-                                        }
+                                        (void) execlp(PATHBULOGIC,"simple_message_server_logic" ,NULL);
+                                        
+                                        fprintf(stderr, "execlp() failed: %s\n", strerror(errno));
 					exit(EXIT_FAILURE);
-					break;
 		   }
 		   default:{ /*mother process*/
 					close(sockfdchild);  /* parent doesn't need this */
-                                        printf("pid = %d\n", pid); /* Debug info */
-					while ((waitPID = waitpid(pid, &state, 0)) != pid)
-					{
-						printf("waitpid = %d\n", waitPID);
-                                                if (waitPID == -1){
-							if (errno == EINTR){
-								continue;      
-							}
-						errno = ECHILD;    
-						}
-					}
-    
-					if (!WIFEXITED(state)){			
-						fprintf(stderr,"Child with PID:%d did not exit normally", waitPID);
-					}
 			}
 	   }  
     }
