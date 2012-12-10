@@ -296,10 +296,14 @@ void read_from_serv(const int sockfd)
 			continue;
 		}
 		if(reccount == 3 || reccount == 6){ /*length of html or png file*/
-			if (strncmp(buffer, "len=", 4) != 0) {
+			 printf("record %d beginnt\n", reccount); /*debuginfo*/
+                        /* printf("%s\n", buffer);*/
+                         /*if (strncmp((const char *)buffer, "len=", 4) != 0) {
 				fprintf(stderr, "cannot determine content length in the servers response\nexiting!\n");
 				exit(EXIT_FAILURE);
-			}
+			}*/
+                        printf("bla");
+                        printf("record %d nach strcnmp", reccount);
                         if ( len != NULL ) {
                         len = realloc((void*)len, (strlen(buffer)-5) * sizeof(char));
                         }
@@ -332,10 +336,12 @@ void read_from_serv(const int sockfd)
 			continue;
 		}
 		if(reccount == 4){
+                        printf("recodord 4 beginnt");
 			if(i<filelen){
 				fprintf(htmlfile, "%s", buffer);
 			}else{
 				reccount++;
+                                filelen = 0;
 			}
 			i += strlen(buffer);
         }
@@ -396,7 +402,8 @@ void read_from_serv(const int sockfd)
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
 
-	close_conn(fpread, SHUT_RD);  /* close the read direction of the socket */
+	/*close_conn(fpread, SHUT_RD);*/  /* close the read direction of the socket */
+        fclose(fpread);
 }
 
 /**

@@ -37,7 +37,7 @@
 */
 
 #define BACKLOG 10   /* how many pending connections queue will hold */
-#define PATHBULOGIC "/usr/local/bin/simple_message_server_logic" /*the path of the business_logic*/
+#define PATHBULOGIC "bla/usr/local/bin/simple_message_server_logic" /*the path of the business_logic*/
 
 /*
 * -------------------------------------------------------------- typedefs --
@@ -239,15 +239,21 @@ int main(int argc, const char * const * argv)
 						close(sockfdchild);
 						exit(EXIT_FAILURE);
 					}
-					(void) execlp(PATHBULOGIC,"simple_message_server_logic" ,NULL);
+                                        errno = 0;
+                                        if ( execlp(PATHBULOGIC,"simple_message_server_logic" ,NULL) == -1) {
+                                                fprintf(stderr, "execlp() failed: %s", strerror(errno));
+                                                exit(EXIT_FAILURE);
+                                        }
 					exit(EXIT_FAILURE);
 					break;
 		   }
 		   default:{ /*mother process*/
 					close(sockfdchild);  /* parent doesn't need this */
+                                        printf("pid = %d\n", pid); /* Debug info */
 					while ((waitPID = waitpid(pid, &state, 0)) != pid)
 					{
-						if (waitPID == -1){
+						printf("waitpid = %d\n", waitPID);
+                                                if (waitPID == -1){
 							if (errno == EINTR){
 								continue;      
 							}
