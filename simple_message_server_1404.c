@@ -6,9 +6,9 @@
 * @author Mihajlo Milanovic   <ic11b081@technikum-wien.at>
 * @date 2012/12/10
 *
-* @version $Revision: 001 $
+* @version $Revision: 009 $
 *
-* @todo - remove debug printf(), add doxygen Kommentare
+* @todo -
 *
 * URL: $HeadURL$
 *
@@ -22,7 +22,6 @@
 #include <stdlib.h>                             /* exit() */
 #include <errno.h>                              /* error handling */
 #include <unistd.h>
-#include "simple_message_client_commandline_handling.h"
 #include <sys/types.h>                           /* getaddrinfo() */
 #include <sys/socket.h>                          /* getaddrinfo() */
 #include <netdb.h>                               /* getaddrinfo() */
@@ -51,18 +50,19 @@
 * ------------------------------------------------------------- functions --
 */
 
+/**
+*
+* \brief signal handler for killing zombie children
+*
+* \parm inst s - 
+*
+* \return failure in all cases
+*
+*/
 void sigchld_handler(int s)
 {
     while(waitpid(-1, NULL, WNOHANG) > 0);
     s=s; /*avoid the warning */
-}
-
-void *get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
 /**
@@ -81,6 +81,16 @@ void usagefunc(const char * cmd) {
 	exit(EXIT_FAILURE);
 }
 
+/**
+*
+* \brief parsing the commandline
+*
+* \parm int argc - argc param
+* \parm const char * const * argv - argv param
+*
+* \return failure if commandline params are invalid
+*
+*/
 void parse_commandline(int argc, const char * const * argv){
 	
 	char *endptrstrtol  = NULL;
@@ -108,18 +118,21 @@ void parse_commandline(int argc, const char * const * argv){
                        fprintf(stderr, "Fehler: Port ist zu hoch : %ld\n", lport);
                        usagefunc(argv[0]);
                 }
-                    fprintf(stderr, "Debug: Portnummer von strtol() = %ld\n", lport);
             /* argv[2] is a valid number from 0 to 65535 */
     	    }
     }
-    /* just debug info */
-    fprintf(stdout, "von commandline hat smserver erhalten:\n"
-                    "\tstring argv[2] = %s\n"
-                    "\tlong port      = %ld\n"
-                    , argv[2], lport);
 
 }
 
+/**
+*
+* \brief get the port
+*
+* \parm int sockfd - Socket Filedescriptor
+* \parm const char * const * argv - the argv param
+* \return the socketdescriptor
+*
+*/
 int get_port(int sockfd, const char * const * argv){
 
 struct addrinfo hints, *servinfo, *p;
@@ -127,10 +140,10 @@ struct sigaction sa;
 int yes             =  1;
     int rv              = -1;
 
-memset(&hints, 0, sizeof hints);
+	memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;        /* IPv4 and IPv6 supported */
     hints.ai_socktype = SOCK_STREAM;    /* TCP */
-    hints.ai_flags = AI_PASSIVE;        /* use my IP address */
+    hints.ai_flags = AI_PASSIVE;        /* use any IP address */
     
     if ((rv = getaddrinfo(NULL, argv[2], &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
@@ -174,7 +187,6 @@ memset(&hints, 0, sizeof hints);
         perror("sigaction");
         exit(1);
     }
-    fprintf(stderr, "server: waiting for connections...\n");
     return sockfd;
 
 }
@@ -194,8 +206,6 @@ memset(&hints, 0, sizeof hints);
 int main(int argc, const char * const * argv)
 {
     
-    char s[INET6_ADDRSTRLEN];
-    
     int sockfd          = -1;  /* listen on sockfd */
     int sockfdchild     = -1;  /* new connection on sockfdchild */
     struct sockaddr_storage their_addr; /* client's address information */
@@ -214,17 +224,14 @@ int main(int argc, const char * const * argv)
             perror("accept");
             continue;
         }
-
-        inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof s); /* get information about the connected client */
-        fprintf(stderr, "server: got connection from %s\n", s);
         
-       switch (pid = fork())
+       switch (pid = fork()) /*forking the child....*/
        {
 		   case -1: { /*error*/
 					close(sockfdchild);
 					close(sockfd);
 					fprintf(stderr,"error after forking");
-					exit(1);
+					exit(1); /*maybe it would be better not to exit the program here...*/
 					break;
 			}
 		   case 0:{/*child process*/
@@ -237,11 +244,11 @@ int main(int argc, const char * const * argv)
 						close(sockfdchild);
 						exit(EXIT_FAILURE);
 					}
-                                        errno = 0;
-                                        (void) execlp(PATHBULOGIC,"simple_message_server_logic" ,NULL);
+                    errno = 0;
+                    (void) execlp(PATHBULOGIC,"simple_message_server_logic" ,NULL);
                                         
-                                        fprintf(stderr, "execlp() failed: %s\n", strerror(errno));
-					exit(EXIT_FAILURE);
+					fprintf(stderr, "execlp() failed: %s\n", strerror(errno));
+					exit(EXIT_FAILURE); 
 		   }
 		   default:{ /*mother process*/
 					close(sockfdchild);  /* parent doesn't need this */

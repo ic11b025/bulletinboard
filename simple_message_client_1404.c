@@ -73,22 +73,6 @@ void usagefunc(FILE * stream, const char * cmd, int exitcode) {
 	exit(exitcode);
 }
 
-/**
-*
-* \brief ckecks if the struct sockaddr contains an IPv4 or IPv6 address information
-*
-* \parm struct sockaddr * - the struct which point to the struct with the address information
-*
-* \return void * - pointer to the IPv4 or IPv6 address
-*
-*/
-void *get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
 
 /**
 *
@@ -107,12 +91,11 @@ int get_server_info(const char * server, const char * port) {
     struct addrinfo hints;
     struct addrinfo *servinfo;       /* will point to the results */
     struct addrinfo *p;              /* auxiliary pointer for *servinfo */
-    char ipstr[INET6_ADDRSTRLEN];    /* string to store IP address */
     
     memset(&hints, 0, sizeof hints); /* make sure the struct is empty */
     hints.ai_family = AF_UNSPEC;     /* IPv4 and IPv6 may be used */
     hints.ai_socktype = SOCK_STREAM; /* use TCP stream sockets */
-    /*hints.ai_flags = AI_PASSIVE;*//*only for server*/     /* fill in my IP for me */    
+        
     /* call getaddrinfo to fill the struct servinfo */
     if ((status = getaddrinfo(server, port, &hints, &servinfo)) != 0) {
     fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
@@ -121,55 +104,26 @@ int get_server_info(const char * server, const char * port) {
 /* servinfo now points to a linked list of 1 or more struct addrinfo */
 
     /* this loop goes throu the linked list, to catch all server addresses */
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        void *addr;
-        char *ipver;   /* debug - print the IP version */
-        /* get the pointer to the address itself,
-           different fields in IPv4 and IPv6:      */
-        if (p->ai_family == AF_INET) {     /* IPv4 */
-            struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
-            addr = &(ipv4->sin_addr);
-            ipver = "IPv4";
-        } else {                           /* IPv6 */
-            struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)p->ai_addr;
-            addr = &(ipv6->sin6_addr);
-            ipver = "IPv6";
-        }
-
-        /* debug info only */
-        /* convert the IP address to a string and print it: */
-        inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
-        printf("ai_family=%d and found %s address: %s Port: %s\n", p->ai_family, ipver, ipstr, port);
-    
+    for(p = servinfo; p != NULL; p = p->ai_next) {   
         /* call socket(). Returns the socketnumber, required for connect() */
         errno  = 0;
         if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) != 0) {
         /* error handling and continue with next struct (ai_next) */
         perror("client: socket");
         }
-
         /* now we call connect */
         if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sockfd);
             perror("client: connect");
             continue;      /* go to ai_next, maybe we can connect there */
         }
-        printf("break\n"); /* printf for debug */
         break;             /* leave the for loop, because connect() did not report error */
   } 
     
     if (p == NULL) {
         return -1;         /* the for loop did not find any address where we could connect - all tries have failed */
     }
-    
-    
-    /* now we are connected! Huhuu! */
-    /* convert the IP address to a string and print it */
-    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr, sizeof ipstr);
-    printf("client: connected to %s : %s\n", ipstr, port);
-
     freeaddrinfo(servinfo); /* free the linked-list */
-    
     return sockfd;
 }
 
@@ -189,7 +143,6 @@ void close_conn(FILE * fp, const int mode)
 {
         int sd = -1;
         sd = fileno(fp); /* get the file descriptor which to close */
-        printf("close_conn(): sd to close=%d\n", sd); /* debug info only */
 
         errno = 0;
         if (fflush(fp) == EOF){   /* flush the buffer */
@@ -237,6 +190,16 @@ void write_to_serv(const int sockfdwrite, const char *user, const char *message,
         close_conn(fpwrite, SHUT_WR);  /* close the write direction of the socket. Server will receive EOF */
 }
 
+/**
+*
+* \brief receives the data from the server, throu the socket
+*
+* \parm const int sockfd - filedescriptor of the socket to be used for reading data
+*
+* \return void
+*
+*/
+
 void read_from_serv(const int sockfd)
 {
 	char buffer[BUFFLEN];
@@ -260,7 +223,6 @@ void read_from_serv(const int sockfd)
 	while (fgets(buffer, BUFFLEN, fpread) != NULL){  /* fgets() reads until linefeed or EOF */
 
 		if(reccount == 1){
-			printf("record 1 : status code from server : %c\n", buffer[7]); /*debuginfo*/
 			if (strncmp(buffer, "status=0", 8) != 0) { /* check the status returned by the server */
                                 fprintf(stderr, "Server returned error status %c\nexiting!\n", buffer[7]);
                                 exit(EXIT_FAILURE);
@@ -269,7 +231,6 @@ void read_from_serv(const int sockfd)
 			continue;
 		}
 		if(reccount == 2){
-			printf("record 2 : filename for HTML content\n"); /*debuginfo*/
             if (strncmp(buffer, "file=", 5) != 0) {
 				fprintf(stderr, "cannot determine filename for HTML content in the servers response\nexiting!\n");
                 exit(EXIT_FAILURE);
@@ -278,13 +239,9 @@ void read_from_serv(const int sockfd)
 			htmlname = malloc((strlen(buffer)-6) * sizeof(char));
 			if(htmlname == NULL)
 				fprintf(stderr, "Fehler malloc vom HTML-File\n");
-			printf("htmlname länge = %d\n", (int)strlen(buffer)); /*debuginfo*/
 			for(i=5;i<(strlen(buffer)-1);i++){
-				printf("i=%d : ",i); /*debuginfo*/
 				htmlname[i-5] = buffer[i];
-				printf("%c = %c\n",htmlname[i-5], buffer[i]); /*debuginfo*/
 			}
-			printf("record 2 vorbei\n"); /*debuginfo*/
 			if((htmlfile = fopen(htmlname,"w+")) ==  NULL) {
 				fprintf(stderr, "cannot open file %s to write HTML content\n"
                                 "check for write permission in directory\n"
@@ -296,14 +253,11 @@ void read_from_serv(const int sockfd)
 			continue;
 		}
 		if(reccount == 3 || reccount == 6){ /*length of html or png file*/
-			 printf("record %d beginnt\n", reccount); /*debuginfo*/
-                        /* printf("%s\n", buffer);*/
-                         /*if (strncmp((const char *)buffer, "len=", 4) != 0) {
+                        
+                         if (strncmp(buffer, "len=", 4) != 0) {
 				fprintf(stderr, "cannot determine content length in the servers response\nexiting!\n");
 				exit(EXIT_FAILURE);
-			}*/
-                        printf("bla");
-                        printf("record %d nach strcnmp", reccount);
+			}
                         if ( len != NULL ) {
                         len = realloc((void*)len, (strlen(buffer)-5) * sizeof(char));
                         }
@@ -315,7 +269,7 @@ void read_from_serv(const int sockfd)
 			for(i=4;i<(strlen(buffer)-1);i++){
 				len[i-4] = buffer[i];
 			}
-			
+
                         errno = 0;
                         filelen = strtol(len, &endptrstrtol, 10);
                         if ((errno == ERANGE && (filelen == LONG_MAX || filelen == LONG_MIN)) || (errno != 0 && filelen == 0)) {
@@ -336,7 +290,7 @@ void read_from_serv(const int sockfd)
 			continue;
 		}
 		if(reccount == 4){
-                        printf("recodord 4 beginnt");
+                        
 			if(i<filelen){
 				fprintf(htmlfile, "%s", buffer);
 			}else{
@@ -346,7 +300,6 @@ void read_from_serv(const int sockfd)
 			i += strlen(buffer);
         }
 		if(reccount == 5){
-			printf("record 5 : PNG Filename\n"); /*debuginfo*/
             if (strncmp(buffer, "file=", 5) != 0) {            
 				fprintf(stderr, "cannot determine filename for PNG content in the servers response\nexiting!\n");
                 exit(EXIT_FAILURE);
@@ -354,13 +307,11 @@ void read_from_serv(const int sockfd)
             pngname = malloc((strlen(buffer)-6) * sizeof(char));
             if(pngname == NULL)
 				fprintf(stderr,"Fehler beim malloc von png-File");
-            printf("pngname länge = %d\n", (int)strlen(buffer)); /*debuginfo*/
+            
             for (i=5; i < (strlen(buffer)-1); i++) {
-				printf("i=%d : ",i); /*debuginfo*/
                 pngname[i-5] = buffer[i];
-                printf("%c = %c\n",pngname[i-5], buffer[i]); /*debuginfo*/
             }
-            printf("record 5 vorbei\n"); /*debuginfo*/
+            
             if((pngfile = fopen(pngname,"w+")) ==  NULL){
 				fprintf(stderr, "cannot open file %s to write PNG content\n"
                                 "check for write permission in directory\n"
@@ -371,7 +322,7 @@ void read_from_serv(const int sockfd)
             reccount++;
             continue;
         }
-		
+
 	}   
 	/* now the binary content for the png file is read from the filepointer */
 	while (i<filelen){
@@ -388,11 +339,9 @@ void read_from_serv(const int sockfd)
 			}
 			fwrite(&buffer,sizeof(char), BUFFLEN, pngfile);
 		}
-		
+
 		i+=BUFFLEN;
 	}
-	
-	
 	errno = 0;
 	if(fclose(htmlfile) == EOF){ /* close the HTML file */
 		fprintf(stderr, "%s\n", strerror(errno));
@@ -402,8 +351,10 @@ void read_from_serv(const int sockfd)
 		fprintf(stderr, "%s\n", strerror(errno));
 	}
 
-	/*close_conn(fpread, SHUT_RD);*/  /* close the read direction of the socket */
-        fclose(fpread);
+	
+       if(fclose(fpread) == EOF){
+			fprintf(stderr, "%s\n", strerror(errno));
+	   }
 }
 
 /**
@@ -432,15 +383,6 @@ int main(int argc, const char * const * argv)
     /* fill the const char *server, port, user, message, img_url and int verbose with data from command line */    
     smc_parsecommandline(argc, argv, *usagefunc, &server, &port, &user, &message, &img_url, &verbose);
 
-    /* just debug info */
-    fprintf(stdout, "von smc_parsecommandline erhalten:\n"
-                    "\tserver=%s\n"
-                    "\tport=%s\n"
-                    "\tuser=%s\n"
-                    "\tmessage=%s\n"
-                    "\timg=%s\n"
-                    "\tverbose=%d\n\n", server, port, user, message, img_url, verbose);
-
     /* create structs with address information */
     if ((sockfd = get_server_info(server, port)) == -1) {
 		fprintf(stderr, "client: failed to connect\n");
@@ -462,3 +404,4 @@ int main(int argc, const char * const * argv)
 /*
 * =================================================================== eof ==
 */
+
